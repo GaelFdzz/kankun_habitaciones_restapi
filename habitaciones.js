@@ -40,6 +40,10 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
  *     responses:
  *       200:
  *         description: Lista de habitaciones obtenida exitosamente
+ *       500:
+ *         description: Error al obtener las habitaciones
+ *       404:
+ *         description: No hay habitaciones registradas
  */
 app.get('/habitaciones', async (req, res) => {
     const { data, error } = await supabase.from('habitaciones').select('*');
@@ -71,6 +75,8 @@ app.get('/habitaciones', async (req, res) => {
  *         description: Habitación encontrada
  *       404:
  *         description: Habitación no encontrada
+ *       400:
+ *         description: ID inválido
  */
 app.get('/habitaciones/:id', async (req, res) => {
     const id = parseInt(req.params.id, 10);
@@ -114,6 +120,10 @@ app.get('/habitaciones/:id', async (req, res) => {
  *     responses:
  *       201:
  *         description: Habitación creada exitosamente
+ *       400:
+ *         description: Datos de la habitación inválidos
+ *       409:
+ *         description: El número de habitación ya existe
  */
 app.post('/habitaciones', async (req, res) => {
     const { num_habi, tipo, capacidad, precio, estado } = req.body;
@@ -175,6 +185,10 @@ app.post('/habitaciones', async (req, res) => {
  *     responses:
  *       200:
  *         description: Habitación actualizada exitosamente
+ *       400:
+ *         description: Datos inválidos o ID inválido
+ *       404:
+ *         description: Habitación no encontrada
  */
 app.patch('/habitaciones/:id', async (req, res) => {
     const id = parseInt(req.params.id, 10);
@@ -241,6 +255,10 @@ app.patch('/habitaciones/:id', async (req, res) => {
  *     responses:
  *       204:
  *         description: Habitación eliminada exitosamente
+ *       400:
+ *         description: ID inválido
+ *       404:
+ *         description: Habitación no encontrada
  */
 app.delete('/habitaciones/:id', async (req, res) => {
     const id = parseInt(req.params.id, 10);
