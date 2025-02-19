@@ -13,6 +13,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 app.use(cors());
 app.use(express.json());
 
+// Configuración de Swagger
 const swaggerOptions = {
     definition: {
         openapi: "3.0.0",
@@ -30,7 +31,6 @@ const swaggerOptions = {
 const swaggerDocs = swaggerJsdoc(swaggerOptions);
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
-
 /**
  * @swagger
  * /habitaciones:
@@ -43,7 +43,13 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
  */
 app.get('/habitaciones', async (req, res) => {
     const { data, error } = await supabase.from('habitaciones').select('*');
+
     if (error) return res.status(500).json({ error: error.message });
+
+    if (!data || data.length === 0) {
+        return res.status(404).json({ error: "No hay habitaciones registradas" });
+    }
+
     res.json(data);
 });
 
@@ -67,9 +73,18 @@ app.get('/habitaciones', async (req, res) => {
  *         description: Habitación no encontrada
  */
 app.get('/habitaciones/:id', async (req, res) => {
-    const { id } = req.params;
+    const id = parseInt(req.params.id, 10);
+
+    if (isNaN(id) || id <= 0) {
+        return res.status(400).json({ error: "ID inválido. Debe ser un número entero positivo." });
+    }
+
     const { data, error } = await supabase.from('habitaciones').select('*').eq('habitacion_id', id).single();
-    if (error) return res.status(404).json({ error: "Habitación no encontrada" });
+
+    if (error || !data) {
+        return res.status(404).json({ error: "Habitación no encontrada" });
+    }
+
     res.json(data);
 });
 
@@ -102,6 +117,21 @@ app.get('/habitaciones/:id', async (req, res) => {
  */
 app.post('/habitaciones', async (req, res) => {
     const { num_habi, tipo, capacidad, precio, estado } = req.body;
+
+    if (!num_habi || !tipo || !capacidad || !precio || estado === undefined) {
+        return res.status(400).json({ error: "Todos los campos son obligatorios." });
+    }
+
+    const { data: existeHabitacion } = await supabase
+        .from('habitaciones')
+        .select('*')
+        .eq('num_habi', num_habi)
+        .single();
+
+    if (existeHabitacion) {
+        return res.status(409).json({ error: "El número de habitación ya existe." });
+    }
+
     const { data, error } = await supabase
         .from('habitaciones')
         .insert([{ num_habi, tipo, capacidad, precio, estado }])
@@ -109,13 +139,14 @@ app.post('/habitaciones', async (req, res) => {
         .single();
 
     if (error) return res.status(500).json({ error: error.message });
+
     res.status(201).json(data);
 });
 
 /**
  * @swagger
  * /habitaciones/{id}:
- *   put:
+ *   patch:
  *     summary: Actualiza una habitación
  *     tags: [Habitaciones]
  *     parameters:
@@ -124,7 +155,6 @@ app.post('/habitaciones', async (req, res) => {
  *         required: true
  *         schema:
  *           type: integer
- *         description: ID de la habitación a actualizar
  *     requestBody:
  *       required: true
  *       content:
@@ -146,9 +176,43 @@ app.post('/habitaciones', async (req, res) => {
  *       200:
  *         description: Habitación actualizada exitosamente
  */
-app.put('/habitaciones/:id', async (req, res) => {
-    const { id } = req.params;
+app.patch('/habitaciones/:id', async (req, res) => {
+    const id = parseInt(req.params.id, 10);
     const { num_habi, tipo, capacidad, precio, estado } = req.body;
+
+    if (isNaN(id) || id <= 0) {
+        return res.status(400).json({ error: "ID inválido. Debe ser un número entero positivo." });
+    }
+
+    if (isNaN(num_habi) || num_habi <= 0) {
+        return res.status(400).json({ error: "Numero de habitacion invalida! Debe ser un número entero positivo." });
+    }
+
+    // Validación de tipo
+    if (tipo && typeof tipo !== 'string') {
+        return res.status(400).json({ error: "El tipo debe ser una cadena de texto." });
+    }
+
+    // Validación de capacidad
+    if (capacidad && (isNaN(capacidad) || capacidad <= 0)) {
+        return res.status(400).json({ error: "Capacidad inválida. Debe ser un número entero positivo." });
+    }
+
+    // Validación de precio
+    if (precio && (isNaN(precio) || precio <= 0)) {
+        return res.status(400).json({ error: "Precio inválido. Debe ser un número entero positivo." });
+    }
+
+    // Validación de estado
+    if (estado !== undefined && typeof estado !== 'boolean') {
+        return res.status(400).json({ error: "El estado debe ser un valor booleano (true o false)." });
+    }
+
+    const { data: habitacionExistente } = await supabase.from('habitaciones').select('*').eq('habitacion_id', id).single();
+
+    if (!habitacionExistente) {
+        return res.status(404).json({ error: "Habitación no encontrada" });
+    }
 
     const { data, error } = await supabase
         .from('habitaciones')
@@ -158,6 +222,7 @@ app.put('/habitaciones/:id', async (req, res) => {
         .single();
 
     if (error) return res.status(500).json({ error: error.message });
+
     res.json(data);
 });
 
@@ -173,19 +238,29 @@ app.put('/habitaciones/:id', async (req, res) => {
  *         required: true
  *         schema:
  *           type: integer
- *         description: ID de la habitación a eliminar
  *     responses:
  *       204:
  *         description: Habitación eliminada exitosamente
  */
 app.delete('/habitaciones/:id', async (req, res) => {
-    const { id } = req.params;
+    const id = parseInt(req.params.id, 10);
+
+    if (isNaN(id) || id <= 0) {
+        return res.status(400).json({ error: "ID inválido. Debe ser un número entero positivo." });
+    }
+
+    const { data: habitacionExistente } = await supabase.from('habitaciones').select('*').eq('habitacion_id', id).single();
+
+    if (!habitacionExistente) {
+        return res.status(404).json({ error: "Habitación no encontrada" });
+    }
+
     const { error } = await supabase.from('habitaciones').delete().eq('habitacion_id', id);
 
     if (error) return res.status(500).json({ error: error.message });
-    res.status(204).send(); // No Content
-});
 
+    res.status(204).send();
+});
 
 app.listen(port, () => {
     console.log(`✅ Servidor corriendo en http://localhost:${port}`);
